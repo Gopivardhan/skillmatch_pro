@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: skillmatch_db
+    volumes:
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql:ro
+      - ../database/seeds.sql:/docker-entrypoint-initdb.d/2_seeds.sql:ro
+    ports:
+      - "5432:5432"
+
+  ml:
+    build:
+      context: ..
+      dockerfile: docker/ml.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: skillmatch_db
+      JWT_SECRET: supersecret
+      ML_SERVICE_URL: http://ml:5000
+    depends_on:
+      - db
+      - ml
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    restart: unless-stopped
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:3001
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
